@@ -52,7 +52,7 @@ void checkCUDAError(const char* msg, int line = -1) {
 #define maxSpeed 1.0f
 
 /*! Size of the starting area in simulation space. */
-#define scene_scale 200.0f
+#define scene_scale 100.0f
 
 /***********************************************
 * Kernel state (pointers are device pointers) *
@@ -444,6 +444,8 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 				if (gridCellStartIndices[gridIndex] != -1) // -1 means the cell is empty
 				{
 					// - For each cell, read the start/end indices in the boid pointer array.
+					//   DIFFERENCE: For best results, consider what order the cells should be
+					//   checked in to maximize the memory benefits of reordering the boids data.
 					for (int b = gridCellStartIndices[gridIndex]; b <= gridCellEndIndices[gridIndex]; b++) {
 						// - Access each boid in the cell and compute velocity change from
 						// the boids rules, if this boid is within the neighborhood distance.
@@ -497,14 +499,94 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	int N, int gridResolution, glm::vec3 gridMin,
 	float inverseCellWidth, float cellWidth,
 	int* gridCellStartIndices, int* gridCellEndIndices,
+	float searchDistance,
 	glm::vec3* pos, glm::vec3* vel1, glm::vec3* vel2) {
 	// TODO-2.3 - This should be very similar to kernUpdateVelNeighborSearchScattered,
 	// except with one less level of indirection.
 	// This should expect gridCellStartIndices and gridCellEndIndices to refer
 	// directly to pos and vel1.
+	// 
 	// - Identify the grid cell that this particle is in
+	int boidIndex = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (boidIndex >= N) {
+		return;
+	}
+	glm::vec3 boidPos = pos[boidIndex];
+
 	// - Identify which cells may contain neighbors. This isn't always 8.
+	float search = 2 * searchDistance / cellWidth;
+	glm::vec3 currGridIndices = floor((boidPos - gridMin) * inverseCellWidth);
+	int minX = glm::fract(currGridIndices.x) <= 0.5f ? currGridIndices.x - search : currGridIndices.x;
+	int minY = glm::fract(currGridIndices.y) <= 0.5f ? currGridIndices.y - search : currGridIndices.y;
+	int minZ = glm::fract(currGridIndices.z) <= 0.5f ? currGridIndices.z - search : currGridIndices.z;
+	int maxX = glm::fract(currGridIndices.x) > 0.5f ? currGridIndices.x + search : currGridIndices.x;
+	int maxY = glm::fract(currGridIndices.y) > 0.5f ? currGridIndices.y + search : currGridIndices.y;
+	int maxZ = glm::fract(currGridIndices.z) > 0.5f ? currGridIndices.z + search : currGridIndices.z;
+
+	// Variables for rule 1
+	glm::vec3 perceivedCenter(0.f, 0.f, 0.f);
+	int numNeighbors1 = 0;
+	// Variables for rule 2
+	glm::vec3 c(0.f, 0.f, 0.f);
+	// Variables for rule 3
+	glm::vec3 perceivedVelocity(0.f, 0.f, 0.f);
+	int numNeighbors3 = 0;
+
 	// - For each cell, read the start/end indices in the boid pointer array.
+	for (int x = minX; x <= maxX; x++) {
+		for (int y = minY; y <= maxY; y++) {
+			for (int z = minZ; z <= maxZ; z++) {
+				int gridIndex = gridIndex3Dto1D(x, y, z, gridResolution);
+				if (gridCellStartIndices[gridIndex] != -1) // -1 means the cell is empty
+				{
+					// - For each cell, read the start/end indices in the boid pointer array.
+					for (int b = gridCellStartIndices[gridIndex]; b <= gridCellEndIndices[gridIndex]; b++) {
+						// - Access each boid in the cell and compute velocity change from
+						// the boids rules, if this boid is within the neighborhood distance.
+						// Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+						float distance = glm::distance(boidPos, pos[b]); // if distance == 0, we ignore this boid since it is itself
+						if (distance > 0) {
+							if (distance < rule1Distance) {
+								perceivedCenter += pos[b];
+								numNeighbors1++;
+							}
+							// Rule 2: boids try to stay a distance d away from each other
+							if (distance < rule2Distance) {
+								c -= (pos[b] - boidPos);
+							}
+							// Rule 3: boids try to match the speed of surrounding boids
+							if (distance < rule3Distance) {
+								perceivedVelocity += vel1[b];
+								numNeighbors3++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	glm::vec3 newVelocity = vel1[boidIndex];
+	// Rule 1 change
+	if (numNeighbors1 > 0) {
+		perceivedCenter /= numNeighbors1;
+		newVelocity += ((perceivedCenter - boidPos) * rule1Scale);
+	}
+	// Rule 2 change
+	newVelocity += c * rule2Scale;
+
+	// Rule 3 change
+	if (numNeighbors3 > 0) {
+		perceivedVelocity /= numNeighbors3;
+		newVelocity += (perceivedVelocity * rule3Scale);
+	}
+
+	// - Clamp the speed change before putting the new speed in vel2
+	if (glm::length(newVelocity) > maxSpeed) {
+		newVelocity = glm::normalize(newVelocity);
+	}
+	vel2[boidIndex] = newVelocity;
+
 	//   DIFFERENCE: For best results, consider what order the cells should be
 	//   checked in to maximize the memory benefits of reordering the boids data.
 	// - Access each boid in the cell and compute velocity change from
