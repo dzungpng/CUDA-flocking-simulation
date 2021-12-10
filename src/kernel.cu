@@ -70,6 +70,10 @@ glm::vec3* dev_pos;
 glm::vec3* dev_vel1;
 glm::vec3* dev_vel2;
 
+glm::vec3* dev_pos_reordered;
+glm::vec3* dev_vel1_reordered;
+glm::vec3* dev_vel2_reordered;
+
 // LOOK-2.1 - these are NOT allocated for you. You'll have to set up the thrust
 // pointers on your own too.
 
@@ -151,6 +155,17 @@ void Boids::initSimulation(int N) {
 
 	cudaMalloc((void**)&dev_vel2, N * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc dev_vel2 failed!");
+
+	// For part 2.3
+	cudaMalloc((void**)&dev_pos_reordered, N * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMalloc dev_pos failed!");
+
+	cudaMalloc((void**)&dev_vel1_reordered, N * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMalloc dev_vel1 failed!");
+
+	cudaMalloc((void**)&dev_vel2_reordered, N * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMalloc dev_vel2 failed!");
+
 
 	// LOOK-1.2 - This is a typical CUDA kernel invocation.
 	kernGenerateRandomPosArray << <fullBlocksPerGrid, blockSize >> > (1, numObjects,
@@ -594,6 +609,21 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	// - Clamp the speed change before putting the new speed in vel2
 }
 
+__global__ void kernReorderPosAndVelData(int N, int* particleArrayIndices, glm::vec3* pos, glm::vec3* pos_reordered, glm::vec3* vel1, glm::vec3* vel1_reordered, glm::vec3* vel2, glm::vec3* vel2_reordered) {
+	// ALGORITHM (can be parallelized):
+	// 1. Iterate through the re-ordered dev_particleArrayIndices
+	// 2. For each dev_particleArrayIndices[i], use it to index into the dev_pos/dev_vel array
+	// 3. Put the value into dev_new_pos/vel[i]
+	int boidIndex = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (boidIndex >= N) {
+		return;
+	}
+	int index = particleArrayIndices[boidIndex] ;
+	pos_reordered[boidIndex] = pos[index];
+	vel1_reordered[boidIndex] = vel1[index];
+	vel2_reordered[boidIndex] = vel2[index];
+}
+
 /**
 * Step the entire N-body simulation by `dt` seconds.
 */
@@ -644,25 +674,49 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 void Boids::stepSimulationCoherentGrid(float dt) {
 	// TODO-2.3 - start by copying Boids::stepSimulationNaiveGrid
 	// Uniform Grid Neighbor search using Thrust sort on cell-coherent data.
+	int N = numObjects;
+	dim3 fullBlocksPerGrid((N + blockSize - 1) / blockSize);
+	
 	// In Parallel:
 	// - Label each particle with its array index as well as its grid index.
 	//   Use 2x width grids
+	dim3 gridFullBlocksPerGrid((gridCellCount + blockSize - 1) / blockSize);
+	kernResetIntBuffer << < gridFullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
+	kernComputeIndices << < fullBlocksPerGrid, blockSize >> > (N, gridCellWidth, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
 	// - Unstable key sort using Thrust. A stable sort isn't necessary, but you
 	//   are welcome to do a performance comparison.
+	dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
+	dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+
+	thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + N, dev_thrust_particleArrayIndices);
+
 	// - Naively unroll the loop for finding the start and end indices of each
 	//   cell's data pointers in the array of boid indices
+	kernIdentifyCellStartEnd << < fullBlocksPerGrid, blockSize >> > (N, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
 	// - BIG DIFFERENCE: use the rearranged array index buffer to reshuffle all
 	//   the particle data in the simulation array.
 	//   CONSIDER WHAT ADDITIONAL BUFFERS YOU NEED
+	// buffer to keep the original array indices
+	kernReorderPosAndVelData << < fullBlocksPerGrid, blockSize >> > (N, dev_particleArrayIndices, dev_pos, dev_pos_reordered, dev_vel1, dev_vel1_reordered, dev_vel2, dev_vel2_reordered);
 	// - Perform velocity updates using neighbor search
+	kernUpdateVelNeighborSearchCoherent << < fullBlocksPerGrid, blockSize >> > (N, gridCellWidth, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, neighborhoodDistance, dev_pos_reordered, dev_vel1_reordered, dev_vel2_reordered);
 	// - Update positions
-	// - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+	kernUpdatePos << < fullBlocksPerGrid, blockSize >> > (N, dt, dev_pos_reordered, dev_vel2_reordered);
+	// - Ping-pong buffers as needed
+	glm::vec3* temp = dev_vel1_reordered;
+	dev_vel1_reordered = dev_vel2_reordered;
+	dev_vel2_reordered = temp;
 }
 
 void Boids::endSimulation() {
 	cudaFree(dev_vel1);
 	cudaFree(dev_vel2);
 	cudaFree(dev_pos);
+
+	cudaFree(dev_vel1_reordered);
+	cudaFree(dev_vel2_reordered);
+	cudaFree(dev_pos_reordered);
+
 
 	// TODO-2.1 TODO-2.3 - Free any additional buffers here.
 	cudaFree(dev_particleArrayIndices);
