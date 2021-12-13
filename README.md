@@ -34,13 +34,13 @@ _After ~20 seconds_
 
 ### Graph 1: Framerate change with increasing # of boids for [naive](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#11-boids-with-naive-neighbor-search), [scattered uniform](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#20-a-quick-explanation-of-uniform-grids), and [coherent uniform grid](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#23-cutting-out-the-middleman).
 
-![](./media/graph_boids_vs_fps.PNG)
+![](./media/graph_boids_vs_fps.png)
 
 ### Graph 2: Framerate change with increasing [block](https://en.wikipedia.org/wiki/Thread_block_(CUDA_programming)) size
 Number of boids: 100,000 \
 Algorithm: Uniform and Coherent Grid
 
-![](./media/graph_blocksize_vs_fps.PNG)
+![](./media/graph_blocksize_vs_fps.png)
 
 ## Reflections 🤔
 
