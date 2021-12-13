@@ -5,13 +5,12 @@ _Source: University of Pennsylvania, [CIS 565: GPU Programming and Architecture]
 A CUDA and C++ implementation of the famous [Raynolds Boids flocking algorithm](https://en.wikipedia.org/wiki/Boids). The implementation is further optimized with a uniform and coherent grid search, which restrict the search radius of each boid and organize boid data such that they can be conveniently accessed (contiguous in memory).
 
 ## Developer Machine Specs 💻
------------------------------
+
 GCP Windows Server 2016, Intel(R) Zeon(R) CPU @ 2.30GHz 32GB, NVIDIA Testla T4 (TU104) 15360MB
 
 [How to set up a GPU-accelerated windows workstation with GCP](https://cloud.google.com/architecture/creating-a-virtual-gpu-accelerated-windows-workstation)
 
 ## Gallery 🖼️
--------------
 
 **Specs for all images in the gallery:** \
 Number of boids: 50,000 \
@@ -31,7 +30,6 @@ _After ~20 seconds_
 ![](./media/boids_coherent.gif)
 
 ## Performance Analysis 📈
---------------------------
 *Note: the measurements below are done without visualization*
 
 ### Graph 1: Framerate change with increasing # of boids for [naive](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#11-boids-with-naive-neighbor-search), [scattered uniform](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#20-a-quick-explanation-of-uniform-grids), and [coherent uniform grid](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#23-cutting-out-the-middleman).
@@ -45,7 +43,6 @@ Algorithm: Uniform and Coherent Grid
 ![](./media/graph_blocksize_vs_fps.PNG)
 
 ## Reflections 🤔
------------------
 
 Reasons for decreasing FPS with increasing # of boids:
 - More boid neighbors to check and process
