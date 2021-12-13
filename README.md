@@ -1,5 +1,5 @@
-CUDA Flocking Simulation
-==========================
+CUDA Flocking Simulation 🐠 🦩
+=============================
 _Source: University of Pennsylvania, [CIS 565: GPU Programming and Architecture](https://cis565-fall-2021.github.io/)_
 
 A CUDA and C++ implementation of the famous [Raynolds Boids flocking algorithm](https://en.wikipedia.org/wiki/Boids). The implementation is further optimized with a uniform and coherent grid search, which restrict the search radius of each boid and organize boid data such that they can be conveniently accessed (contiguous in memory).
