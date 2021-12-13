@@ -11,7 +11,7 @@ GCP Windows Server 2016, Intel(R) Zeon(R) CPU @ 2.30GHz 32GB, NVIDIA Testla T4 (
 
 # Gallery 🖼️
 
-**Specs for all images in the gallary:** \
+**Specs for all images in the gallery:** \
 Number of boids: 50,000 \
 Boid speed multiplier: 1.0 \
 Grid scale: 100 \
@@ -28,18 +28,18 @@ _After ~20 seconds_
 ## Image 3: Uniform and Coherent Grid Implementation
 ![](./media/boids_coherent.gif)
 
-## Performance Analysis 📈
+# Performance Analysis 📈
 *Note: the measurements below are done without visualization*
 
-### Graph 1: Framerate change with increasing # of boids for [naive](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#11-boids-with-naive-neighbor-search), [scattered uniform](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#20-a-quick-explanation-of-uniform-grids), and [coherent uniform grid](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#23-cutting-out-the-middleman).
+## Graph 1: Framerate change with increasing # of boids for [naive](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#11-boids-with-naive-neighbor-search), [scattered uniform](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#20-a-quick-explanation-of-uniform-grids), and [coherent uniform grid](https://github.com/dzungpng/CUDA-flocking-simulation/blob/main/INSTRUCTION.md#23-cutting-out-the-middleman).
 
-<img src="./media/graph_boids_vs_fps.PNG" width = 600>
+![](./media/graph_boids_vs_fps.PNG)
 
 ## Graph 2: Framerate change with increasing [block](https://en.wikipedia.org/wiki/Thread_block_(CUDA_programming)) size
 Number of boids: 100,000 \
 Algorithm: Uniform and Coherent Grid
 
-<img src="./media/graph_blocksize_vs_fps.PNG" width = 600>
+![](./media/graph_blocksize_vs_fps.PNG)
 
 # Reflections 🤔
 
